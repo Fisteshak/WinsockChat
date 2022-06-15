@@ -13,12 +13,12 @@ int main()
 	setlocale(LC_ALL, "Russian");
 
 	WSADATA wsaData;
-	int errSt;   //статус ошибки
+	int errStat;   //статус ошибки
 
 
 		//инициализация интерфейса сокетов
-	errSt = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (errSt != 0) {
+	errStat = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (errStat != 0) {
 		cout << "Ошибка WSAStartup " << WSAGetLastError();
 		return 1;
 	}
@@ -34,40 +34,48 @@ int main()
 		return 1;
 	}
 	else cout << "Сокет сервера создан и инициализирован" << endl;
-
 	
-	in_addr serv_ip;
-	
+	in_addr serv_ip;	
 
-	errSt = inet_pton(AF_INET, "127.0.0.1", &serv_ip);
+	errStat = inet_pton(AF_INET, "127.0.0.1", &serv_ip);
 
-	if (errSt <= 0) {
+	if (errStat <= 0) {
 		cout << "Ошибка преобразования IP-адреса" << endl;
 		return 1;
 	}
 
-		//привзяка к сокету адреса и порта
-
+		//привязка к сокету адреса и порта
 	sockaddr_in servInfo;
-	ZeroMemory(&servInfo, sizeof(servInfo));
+
+	ZeroMemory(&servInfo, sizeof(servInfo));    //обнулить
 
 	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(1234);
+	servInfo.sin_port = htons(100);
 	servInfo.sin_addr = serv_ip;
 
-	errSt = bind(servSocket, (sockaddr*)&servInfo, sizeof(servInfo));
-	if (errSt != 0) {
+	errStat = bind(servSocket, (sockaddr*)&servInfo, sizeof(servInfo));
+	if (errStat != 0) {
 		cout << "Ошибка привязки сокета к порту и IP-адресу " << WSAGetLastError() << endl;
 		closesocket(servSocket);
 		WSACleanup();
 		return 1;
 	}
 	else cout << "Сокет успешно привязан" << endl;
-
 	
+		//прослушивание сокета
+
+	errStat = listen(servSocket, SOMAXCONN);
+	if (errStat != SOCKET_ERROR) {
+		cout << "Ошибка при прослушивании соединений " << WSAGetLastError() << endl;
+		closesocket(servSocket);
+		WSACleanup();
+		return 1;
+	}
+	else cout << "Слушаю...";
+
+
 
 
 
 
 }
-
