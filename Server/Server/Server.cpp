@@ -25,11 +25,11 @@ int main()
 	else cout << "Winsock инициализирован" << endl;
 
 		//создание и инициализация сокета
-	SOCKET servSocket = socket(AF_INET, SOCK_STREAM, 0);
+	SOCKET servSock = socket(AF_INET, SOCK_STREAM, 0);
 
-	if (servSocket == INVALID_SOCKET) {
+	if (servSock == INVALID_SOCKET) {
 		cout << "Ошибка инициализации сокета " << WSAGetLastError();
-		closesocket(servSocket);
+		closesocket(servSock);
 		WSACleanup();
 		return 1;
 	}
@@ -53,10 +53,10 @@ int main()
 	servInfo.sin_port = htons(100);
 	servInfo.sin_addr = serv_ip;
 
-	errStat = bind(servSocket, (sockaddr*)&servInfo, sizeof(servInfo));
+	errStat = bind(servSock, (sockaddr*)&servInfo, sizeof(servInfo));
 	if (errStat != 0) {
 		cout << "Ошибка привязки сокета к порту и IP-адресу " << WSAGetLastError() << endl;
-		closesocket(servSocket);
+		closesocket(servSock);
 		WSACleanup();
 		return 1;
 	}
@@ -64,18 +64,35 @@ int main()
 	
 		//прослушивание сокета
 
-	errStat = listen(servSocket, SOMAXCONN);
-	if (errStat != SOCKET_ERROR) {
+	errStat = listen(servSock, SOMAXCONN);
+
+	if (errStat != 0) {
 		cout << "Ошибка при прослушивании соединений " << WSAGetLastError() << endl;
-		closesocket(servSocket);
+		closesocket(servSock);
 		WSACleanup();
 		return 1;
 	}
-	else cout << "Слушаю...";
+	else cout << "Слушаю..." << endl;
 
+		//принять соединение
 
+	sockaddr_in clientInfo;		
 
+	ZeroMemory(&clientInfo, sizeof(clientInfo));
 
+	int clientInfo_size = sizeof(clientInfo);
 
+	SOCKET clConn;				//сокет клиента, который подключается к нам
+	clConn = accept(servSock, (sockaddr*)&clientInfo, &clientInfo_size);  
+
+	if (clConn == INVALID_SOCKET) {
+		cout << "Клиент был обнаружен, но произошла ошибка подсоеденения " << WSAGetLastError() << endl;
+		closesocket(servSock);
+		closesocket(clConn);
+		WSACleanup();
+		return 1;
+	}
+	else
+		cout << "Клиент успешно подключён" << endl;
 
 }
