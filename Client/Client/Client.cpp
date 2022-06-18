@@ -92,17 +92,6 @@ int main()
 			return 1;
 		}
 
-		packet_size = recv(clSock, servBuff.data(), servBuff.size(), 0);
-
-		if (packet_size == SOCKET_ERROR) {
-			cout << "Can't receive message from Server. Error # " << WSAGetLastError() << endl;
-			closesocket(clSock);
-			WSACleanup();
-			return 1;
-		}
-		else
-			cout << "Server message: " << servBuff.data() << endl;
-
 	}
 
 	closesocket(clSock);

@@ -118,30 +118,24 @@ if (ioctlsocket(servSock, FIONBIO, &nonBlocking) != 0)
 
 	while (true) {
 		packet_size = recv(clConn, servBuff.data(), servBuff.size(), 0);					// Receiving packet from client. Program is waiting (system pause) until receive
-		cout << "Client's message: " << servBuff.data() << endl;
 
-		cout << "Your (host) message: ";
-		fgets(clientBuff.data(), clientBuff.size(), stdin);
-
-		// Check whether server would like to stop chatting 
-		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
-			shutdown(clConn, SD_BOTH);
-			closesocket(servSock);
-			closesocket(clConn);
-			WSACleanup();
-			return 0;
-		}
-
-		packet_size = send(clConn, clientBuff.data(), clientBuff.size(), 0);
-
-		if (packet_size == SOCKET_ERROR) {
-			cout << "Can't send message to Client. Error # " << WSAGetLastError() << endl;
-			closesocket(servSock);
+		if (packet_size == SOCKET_ERROR || packet_size == 0) {
+			cout << "Ошибка при получении сообщения от клиента " << WSAGetLastError() << endl;
 			closesocket(clConn);
 			WSACleanup();
 			return 1;
 		}
 
+		// Check whether client like to stop chatting 
+		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
+			shutdown(clConn, SD_BOTH);
+			closesocket(clConn);
+			closesocket(servSock);
+			WSACleanup();
+			return 0;
+		}
+
+		cout << "Клиент: " << servBuff.data() << endl;
 	}
 
 	closesocket(servSock);
