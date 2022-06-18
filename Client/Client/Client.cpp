@@ -76,6 +76,9 @@ int main()
 		fgets(clientBuff.data(), clientBuff.size(), stdin);
 
 		// Check whether client like to stop chatting 
+
+
+
 		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
 			shutdown(clSock, SD_BOTH);
 			closesocket(clSock);
