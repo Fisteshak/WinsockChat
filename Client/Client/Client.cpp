@@ -7,7 +7,8 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-constexpr auto BUFF_SIZE = 100;
+constexpr int PORT = 10547;
+constexpr int BUFLEN = 1024;
 
 using std::cout, std::cin, std::endl;
 
@@ -52,7 +53,7 @@ int main()
 	ZeroMemory(&servInfo, sizeof(servInfo));    //обнулить
 
 	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(10547);
+	servInfo.sin_port = htons(PORT);
 	servInfo.sin_addr = serv_ip;
 
 	errStat = connect(clSock, (sockaddr*)&servInfo, sizeof(servInfo));
@@ -65,9 +66,7 @@ int main()
 	}
 	else cout << "Сокет успешно присоединен к серверу" << endl;
 
-
-	
-	std::vector <char> servBuff(BUFF_SIZE), clientBuff(BUFF_SIZE);							// Buffers for sending and receiving data
+	std::vector <char> servBuff(BUFLEN), clientBuff(BUFLEN);							// Buffers for sending and receiving data
 	short packet_size = 0;												// The size of sending / receiving packet in bytes
 
 	while (true) {
@@ -75,10 +74,9 @@ int main()
 		cout << "Your (Client) message to Server: ";
 		fgets(clientBuff.data(), clientBuff.size(), stdin);
 
+		
+
 		// Check whether client like to stop chatting 
-
-
-
 		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
 			shutdown(clSock, SD_BOTH);
 			closesocket(clSock);

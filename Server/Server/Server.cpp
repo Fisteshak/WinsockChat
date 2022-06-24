@@ -7,17 +7,25 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
+constexpr auto MAX_CONNECTIONS = 100;
+constexpr int PORT = 10547;
+constexpr int BUFLEN = 1024;
+
 using std::cout, std::cin, std::endl;
 
 int main()
 {
 	setlocale(LC_ALL, "Russian");
 
-	WSADATA wsaData;
+	bool close_server = false;		//флаг завершения сервера
+	bool compress_array = false;	//флаг сжатия массива соединений
+	bool close_conn = false;		//флаг закрытия соединения
+
 	int errStat;   //статус ошибки
 
+	WSADATA wsaData;
 
-		//инициализация интерфейса сокетов
+	//инициализация интерфейса сокетов
 	errStat = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (errStat != 0) {
 		cout << "Ошибка WSAStartup " << WSAGetLastError();
@@ -26,11 +34,11 @@ int main()
 	else cout << "Winsock инициализирован" << endl;
 
 	//создание и инициализация сокета
-	SOCKET servSock = socket(AF_INET, SOCK_STREAM, 0);
+	SOCKET listenSock = socket(AF_INET, SOCK_STREAM, 0);
 
-	if (servSock == INVALID_SOCKET) {
+	if (listenSock == INVALID_SOCKET) {
 		cout << "Ошибка инициализации сокета " << WSAGetLastError();
-		closesocket(servSock);
+		closesocket(listenSock);
 		WSACleanup();
 		return 1;
 	}
@@ -45,101 +53,144 @@ int main()
 		return 1;
 	}
 
+	int on = 1;
+
+	errStat = setsockopt(listenSock, SOL_SOCKET, SO_REUSEADDR,
+		(char*)&on, sizeof(on));
+	if (errStat < 0)
+	{
+		perror("setsockopt() failed");
+		closesocket(listenSock);
+		exit(-1);
+	}
+
+	DWORD nonBlocking = 1;
+	if (ioctlsocket(listenSock, FIONBIO, &nonBlocking) != 0)
+	{
+		cout << "Ошибка при переводе сокета в неблокирующий режим " << WSAGetLastError() << endl;
+		return 1;
+	}
+
 	//привязка к сокету адреса и порта
 	sockaddr_in servInfo;
 
 	ZeroMemory(&servInfo, sizeof(servInfo));    //обнулить
 
 	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(10547);
+	servInfo.sin_port = htons(PORT);
 	servInfo.sin_addr = serv_ip;
 
-	errStat = bind(servSock, (sockaddr*)&servInfo, sizeof(servInfo));
+	int servInfoLen = sizeof(servInfo);
+
+	errStat = bind(listenSock, (sockaddr*)&servInfo, servInfoLen);
+
 	if (errStat != 0) {
 		cout << "Ошибка привязки сокета к порту и IP-адресу " << WSAGetLastError() << endl;
-		closesocket(servSock);
+		closesocket(listenSock);
 		WSACleanup();
 		return 1;
 	}
 	else cout << "Сокет успешно привязан" << endl;
 
-
-	//перевод сокета в неблокирующий режим
-	// ? как работать с неблок
-/*DWORD nonBlocking = 1;
-if (ioctlsocket(servSock, FIONBIO, &nonBlocking) != 0)
-{
-	printf("failed to set non-blocking socket\n");
-	return false;
-}*/
-
-//прослушивание сокета
-
-
-	errStat = listen(servSock, SOMAXCONN);
+	//перевести сокет в режим прослушивания
+	errStat = listen(listenSock, SOMAXCONN);
 
 	if (errStat != 0) {
-		cout << "Ошибка при прослушивании соединений " << WSAGetLastError() << endl;
-		closesocket(servSock);
+		cout << "Ошибка при переводе сокета в прослушивающий режим " << WSAGetLastError() << endl;
+		closesocket(listenSock);
 		WSACleanup();
 		return 1;
 	}
-	else cout << "Слушаю..." << endl;
-
-	//принять соединение
-
-	sockaddr_in clientInfo;
 
 
-	ZeroMemory(&clientInfo, sizeof(clientInfo));
+	struct pollfd fds[MAX_CONNECTIONS];             //массив соединений
+	int fdsNum = 1;									//количество соединений в fds
 
-	int clientInfo_size = sizeof(clientInfo);
+	memset(fds, 0, sizeof(fds));					//инициализировать fds
 
-	SOCKET clConn;				//сокет клиента, который подключается к нам
+	fds[0].fd = listenSock;							//в 1й ячейке слушающий сокет
+	fds[0].events = POLLIN;
 
-	clConn = accept(servSock, (sockaddr*)&clientInfo, &clientInfo_size);
+	do {
+		errStat = WSAPoll(fds, fdsNum, -1);
 
-	if (clConn == INVALID_SOCKET) {
-		cout << "Клиент был обнаружен, но произошла ошибка подсоединения " << WSAGetLastError() << endl;
-		closesocket(servSock);
-		closesocket(clConn);
-		WSACleanup();
-		return 1;
-	}
-	else
-		cout << "Клиент успешно подключён" << endl;
-
-	std::vector <char> clBuff(100);
-	
-	constexpr int BUFF_SIZE = 100;
-
-	std::vector <char> servBuff(BUFF_SIZE), clientBuff(BUFF_SIZE);							// Creation of buffers for sending and receiving data
-	short packet_size = 0;												// The size of sending / receiving packet in bytes
-
-	while (true) {
-		packet_size = recv(clConn, servBuff.data(), servBuff.size(), 0);					// Receiving packet from client. Program is waiting (system pause) until receive
-
-		if (packet_size == SOCKET_ERROR || packet_size == 0) {
-			cout << "Ошибка при получении сообщения от клиента " << WSAGetLastError() << endl;
-			closesocket(clConn);
-			WSACleanup();
-			return 1;
+		if (errStat == SOCKET_ERROR) {
+			cout << "Ошибка WSAPoll() " << WSAGetLastError() << endl;
+			close_server = true;
+			break;
 		}
 
-		// Check whether client like to stop chatting 
-		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
-			shutdown(clConn, SD_BOTH);
-			closesocket(clConn);
-			closesocket(servSock);
-			WSACleanup();
-			return 0;
+		if (fds[0].revents != 0) {			//если в 0м сокете есть событие, то это входящее соединение
+			while (true) {
+
+				SOCKET newConn = accept(listenSock, NULL, NULL);	//принять соединение
+				if (newConn == INVALID_SOCKET) {						//если accept возвращает EWOULDBLOCK, то соединений больше нет
+					break;
+				}
+				fds[fdsNum].fd = newConn;						//добавить соединение в структуру fds
+				fds[fdsNum].events = POLLIN;
+				fdsNum++;
+
+				cout << "Новое входящее соединение " << newConn << endl;
+			}
+			fds[0].revents = 0;
 		}
 
-		cout << "Клиент: " << servBuff.data() << endl;
+		std::vector <char> buf(BUFLEN);  //буфер для входящих данных
+			//просмотреть остальные соединения
+			//если в них есть событие, то это входящее сообщение
+		int i;
+		int fdsNumCp = fdsNum;
+		for (i = 1; i < fdsNum; i++) 
+			if (fds[i].revents != 0) {		//если есть событие
+				fds[i].revents = 0;
+				int dataLen = recv(fds[i].fd, buf.data(), BUFLEN, 0);  //получить данные
+
+				if (dataLen < 0) {					//если есть ошибка, то закрываем соединение
+					cout << "Ошибка при получении данных " << WSAGetLastError() << endl;
+					close_conn = true;					//закрываем соединение				
+				}
+
+				if (dataLen == 0) {		//если передали 0 байт, то клиент отключился
+					cout << "Соединение #" << i << ' ' << fds[i].fd << " отключено" << endl;					
+					close_conn = true;					//закрываем соединение				
+				}
+
+				if (close_conn) {			//закрываем соединение
+					closesocket(fds[i].fd);
+					fds[i].fd = -1;										
+					fdsNumCp--;
+					compress_array = true;	//сжать массив соединений
+					continue;
+				}
+
+				cout << "Клиент #" << i << ": " << buf.data() << std::flush;
+			}
+
+				//если мы закрыли соединение, то в массиве соединений остается пустое место
+				//здесь мы его сжимаем
+
+		if (compress_array) {		
+			int j = 1;
+			for (i = 1; i < fdsNum; i++) {				
+				if (fds[j].fd == -1) {
+					fds[j] = fds[i];					
+					fds[i].fd = -1;					
+				}
+				else j++;
+			}			
+			fdsNum = fdsNumCp;
+		}
+
+	} while (close_server == false);
+
+
+	for (int i = 0; i < fdsNum; i++)
+	{
+		if (fds[i].fd >= 0)
+			closesocket(fds[i].fd);
 	}
 
-	closesocket(servSock);
-	closesocket(clConn);
 	WSACleanup();
 
 	return 0;
