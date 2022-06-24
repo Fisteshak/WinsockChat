@@ -16,6 +16,8 @@ using std::cout, std::cin, std::endl;
 int main()
 {
 	setlocale(LC_ALL, "Russian");
+	SetConsoleCP(1251); // Ввод с консоли в кодировке 1251
+	SetConsoleOutputCP(1251); // Вывод на консоль в кодировке 1251. Нужно только будет изменить шрифт консоли на Lucida Console или Consolas
 
 	bool close_server = false;		//флаг завершения сервера
 	bool compress_array = false;	//флаг сжатия массива соединений
@@ -152,34 +154,39 @@ int main()
 				}
 
 				if (dataLen == 0) {		//если передали 0 байт, то клиент отключился
-					cout << "Соединение #" << i << ' ' << fds[i].fd << " отключено" << endl;					
 					close_conn = true;					//закрываем соединение				
 				}
 
 				if (close_conn) {			//закрываем соединение
 					closesocket(fds[i].fd);
+					cout << "Соединение #" << i << ' ' << fds[i].fd << " отключено" << endl;
 					fds[i].fd = -1;										
-					fdsNumCp--;
 					compress_array = true;	//сжать массив соединений
+					close_conn = false;
+					
 					continue;
 				}
 
-				cout << "Клиент #" << i << ": " << buf.data() << std::flush;
+				cout << "Клиент #" << i << ": " << buf.data() << endl;
 			}
 
 				//если мы закрыли соединение, то в массиве соединений остается пустое место
 				//здесь мы его сжимаем
 
-		if (compress_array) {		
-			int j = 1;
-			for (i = 1; i < fdsNum; i++) {				
-				if (fds[j].fd == -1) {
-					fds[j] = fds[i];					
-					fds[i].fd = -1;					
+		if (compress_array) {							
+			for (i = 0; i < fdsNum; i++)
+			{
+				if (fds[i].fd == -1)
+				{
+					for (int j = i; j < fdsNum; j++)
+					{
+						fds[j].fd = fds[j + 1].fd;
+					}
+					i--;
+					fdsNum--;
 				}
-				else j++;
-			}			
-			fdsNum = fdsNumCp;
+			}
+			compress_array = false;
 		}
 
 	} while (close_server == false);

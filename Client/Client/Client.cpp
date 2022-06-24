@@ -15,6 +15,8 @@ using std::cout, std::cin, std::endl;
 int main()
 {
 	setlocale(LC_ALL, "Russian");
+	SetConsoleCP(1251); // Ввод с консоли в кодировке 1251
+	SetConsoleOutputCP(1251); // Вывод на консоль в кодировке 1251. Нужно только будет изменить шрифт консоли на Lucida Console или Consolas
 
 	WSADATA wsaData;
 	int errStat;   //статус ошибки
@@ -66,15 +68,18 @@ int main()
 	}
 	else cout << "Сокет успешно присоединен к серверу" << endl;
 
-	std::vector <char> servBuff(BUFLEN), clientBuff(BUFLEN);							// Buffers for sending and receiving data
+	std::vector <char> servBuff, clientBuff;							// Buffers for sending and receiving data
+	std::string bufStr;
 	short packet_size = 0;												// The size of sending / receiving packet in bytes
 
 	while (true) {
 
 		cout << "Your (Client) message to Server: ";
-		fgets(clientBuff.data(), clientBuff.size(), stdin);
 
-		
+		getline(cin, bufStr);
+		clientBuff.clear();
+
+		for (int i = 0; i < bufStr.size(); i++) clientBuff.push_back(bufStr[i]);
 
 		// Check whether client like to stop chatting 
 		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
@@ -83,7 +88,7 @@ int main()
 			WSACleanup();
 			return 0;
 		}
-
+		cout << bufStr << endl;
 		packet_size = send(clSock, clientBuff.data(), clientBuff.size(), 0);
 
 		if (packet_size == SOCKET_ERROR) {
