@@ -10,6 +10,7 @@
 
 constexpr int PORT = 10547;
 constexpr int BUFLEN = 1024;
+constexpr bool debug = false;
 
 using std::cout, std::cin, std::endl;
 
@@ -24,7 +25,8 @@ void WSAInit()
 		cout << "Ошибка WSAStartup " << WSAGetLastError();
 		exit(1);
 	}
-	else cout << "Winsock инициализирован" << endl;
+	else if (debug) 
+		cout << "Winsock инициализирован" << endl;
 }
 
 
@@ -40,7 +42,8 @@ void socketInit(const PCSTR& IP, const int& addrFamily, const int& sockType)
 		WSACleanup();
 		exit(1);
 	}
-	else cout << "Сокет клиента создан и инициализирован" << endl;
+	else if (debug) 
+		cout << "Сокет клиента создан и инициализирован" << endl;
 
 	in_addr serv_ip;
 
@@ -66,9 +69,8 @@ void socketInit(const PCSTR& IP, const int& addrFamily, const int& sockType)
 		WSACleanup();
 		exit(1);
 	}
-	else cout << "Сокет успешно присоединен к серверу" << endl;
-
-
+	else if (debug) 
+		cout << "Сокет успешно присоединен к серверу" << endl;
 	
 }
 
@@ -77,20 +79,26 @@ bool end_client = false; //надо ли завершать работу кли�
 void recvThread()
 {
 	int packet_size;
-	std::vector <char> servBuff(BUFLEN);							// Buffers for sending and receiving data
+	std::vector <char> bufRecv(BUFLEN);							// буфер для получения
 
-	while (true) {
-		servBuff.assign(BUFLEN, 0);
-		packet_size = recv(clSock, servBuff.data(), 1024, 0);
+	while (!end_client) {
+		bufRecv.assign(BUFLEN, 0);
+		packet_size = recv(clSock, bufRecv.data(), 1024, 0);
+
 		if (packet_size == 0) {
 			cout << "Сервер прекратил работу." << endl;
-			end_client = true;			
+			
 		}
 		if (packet_size < 0) {
-			cout << "Ошибка при получении данных " << WSAGetLastError() << endl;
+			if (WSAGetLastError() != WSAECONNRESET) 
+				cout << "Ошибка при получении данных " << WSAGetLastError() << endl;
+			else {
+				cout << "Сервер прекратил работу." << endl;
+				end_client = true;
+			}
 		}
 		if (packet_size > 0) {
-			cout << "Сервер: " << servBuff.data() << endl;
+			cout << bufRecv.data() << endl;
 		}
 
 	}
@@ -102,43 +110,38 @@ int main()
 	SetConsoleCP(1251); // Ввод с консоли в кодировке 1251
 	SetConsoleOutputCP(1251); // Вывод на консоль в кодировке 1251. Нужно только будет изменить шрифт консоли на Lucida Console или Consolas
 
+				//ввод имени пользователя
+	std::string username;
+	cout << "Введите ваши имя: " << std::flush;
+	while (username.size() == 0) getline(cin, username);
+
 
 	WSAInit();			//инициализировать WSA
 
 	socketInit("127.0.0.1", AF_INET, SOCK_STREAM);   //инициализация и привязка сокета (clSock) к серверу
 
-	std::vector <char> clientBuff;							// Buffers for sending and receiving data
-	std::string bufStr;
-	short packet_size = 0;												// The size of sending / receiving packet in bytes
-
 	
+	std::string bufSend;										// буфер для отправки
+	short packet_size = 0;										// The size of sending / receiving packet in bytes
+
+			//отправить имя серверу
+			//первая посылка к серверу считается за имя
+	packet_size = send(clSock, username.data(), username.size(), 0);
+
+			//поток для получения данных
 	std::thread recvThr(recvThread);
 
 	while (!end_client) {
-
-		//cout << "Your (Client) message to Server: ";
-
-		getline(cin, bufStr);
-		if (!bufStr.size()) continue;
-		clientBuff.clear();
-
-		for (int i = 0; i < bufStr.size(); i++) clientBuff.push_back(bufStr[i]);
-
-		// Check whether client like to stop chatting 
-		if (clientBuff[0] == 'x' && clientBuff[1] == 'x' && clientBuff[2] == 'x') {
-			shutdown(clSock, SD_BOTH);
-			closesocket(clSock);
-			WSACleanup();
-			return 0;
-		}
-		//cout << bufStr << endl;
-		packet_size = send(clSock, clientBuff.data(), clientBuff.size(), 0);
-
+		
+		while (bufSend.size() == 0) getline(cin, bufSend);					
+			
+		packet_size = send(clSock, bufSend.data(), bufSend.size(), 0);
+		bufSend.clear();
 		if (packet_size == SOCKET_ERROR) {
 			cout << "Can't send message to Server. Error # " << WSAGetLastError() << endl;
 			closesocket(clSock);
 			WSACleanup();
-			return 1;
+			exit(1);
 		}
 
 	}
