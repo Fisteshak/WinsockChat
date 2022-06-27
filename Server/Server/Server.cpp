@@ -146,7 +146,7 @@ int main()
 		for (i = 1; i < fdsNum; i++) 
 			if (fds[i].revents != 0) {		//если есть событие
 				fds[i].revents = 0;
-				int dataLen = recv(fds[i].fd, buf.data(), BUFLEN, 0);  //получить данные
+				int dataLen = recv(fds[i].fd, buf.data(), BUFLEN, 0);  //получить данные				
 
 				if (dataLen < 0) {					//если есть ошибка, то закрываем соединение
 					cout << "Ошибка при получении данных " << WSAGetLastError() << endl;
@@ -166,8 +166,19 @@ int main()
 					
 					continue;
 				}
-
 				cout << "Клиент #" << i << ": " << buf.data() << endl;
+
+
+				//отправить это сообщение остальным клиентам
+				for (auto j = 1; j < fdsNum; j++) 
+					if (i != j) {
+						dataLen = send(fds[j].fd, buf.data(), BUFLEN, 0);
+						if (dataLen < 0) {					//если есть ошибка, то закрываем соединение
+							cout << "Ошибка при отправке данных " << WSAGetLastError() << endl;
+							//close_conn = true;					//закрываем соединение				
+						}
+
+					}
 			}
 
 				//если мы закрыли соединение, то в массиве соединений остается пустое место
