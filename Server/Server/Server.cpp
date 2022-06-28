@@ -23,9 +23,10 @@ void WSAInit()
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		cout << "Ошибка WSAStartup " << WSAGetLastError();
+		cin.get();
 		exit(1);
 	}
-	else 
+	else
 		if (debug) cout << "Winsock инициализирован" << endl;
 }
 
@@ -40,9 +41,10 @@ void socketInit(const int& addrFamily, const int& sockType)
 		cout << "Ошибка инициализации сокета " << WSAGetLastError();
 		closesocket(listenSock);
 		WSACleanup();
+		cin.get();
 		exit(1);
 	}
-	else 
+	else
 		if (debug) cout << "Сокет сервера создан и инициализирован" << endl;
 
 	in_addr serv_ip;
@@ -50,6 +52,7 @@ void socketInit(const int& addrFamily, const int& sockType)
 
 	if (inet_pton(addrFamily, "127.0.0.1", &serv_ip) <= 0) {
 		cout << "Ошибка преобразования IP-адреса" << endl;
+		cin.get();
 		exit(1);
 	}
 
@@ -59,6 +62,7 @@ void socketInit(const int& addrFamily, const int& sockType)
 	{
 		perror("setsockopt() failed");
 		closesocket(listenSock);
+		cin.get();
 		exit(1);
 	}
 
@@ -67,6 +71,7 @@ void socketInit(const int& addrFamily, const int& sockType)
 	if (ioctlsocket(listenSock, FIONBIO, &nonBlocking) != 0)
 	{
 		cout << "Ошибка при переводе сокета в неблокирующий режим " << WSAGetLastError() << endl;
+		cin.get();
 		exit(1);
 	}
 
@@ -81,15 +86,14 @@ void socketInit(const int& addrFamily, const int& sockType)
 
 	int servInfoLen = sizeof(servInfo);
 
-
-
 	if (bind(listenSock, (sockaddr*)&servInfo, servInfoLen) != 0) {
 		cout << "Ошибка привязки сокета к порту и IP-адресу " << WSAGetLastError() << endl;
 		closesocket(listenSock);
 		WSACleanup();
+		cin.get();
 		exit(1);
 	}
-	else if (debug) 
+	else if (debug)
 		cout << "Сокет успешно привязан" << endl;
 
 	//перевести сокет в режим прослушивания
@@ -99,6 +103,7 @@ void socketInit(const int& addrFamily, const int& sockType)
 		cout << "Ошибка при переводе сокета в прослушивающий режим " << WSAGetLastError() << endl;
 		closesocket(listenSock);
 		WSACleanup();
+		cin.get();
 		exit(1);
 	}
 
@@ -180,7 +185,7 @@ int main()
 				fds[fdsNum].fd = newConn;						//добавить соединение в структуру fds
 				fds[fdsNum].events = POLLIN;
 				fdsNum++;
-							
+
 			}
 			fds[0].revents = 0;
 		}
@@ -197,7 +202,7 @@ int main()
 
 				if (dataLen < 0) {					//если есть ошибка, то закрываем соединение
 					if (WSAGetLastError() != WSAECONNRESET)		//WSAECONNRESET означает, что клиент отключился
-						cout << "Ошибка при получении данных " << WSAGetLastError() << endl; 
+						cout << "Ошибка при получении данных " << WSAGetLastError() << endl;
 					close_conn = true;					//закрываем соединение				
 				}
 
@@ -207,12 +212,19 @@ int main()
 
 				if (close_conn) {			//закрываем соединение
 					closesocket(fds[i].fd);
-					SetColor(Green, Black);					
+					SetColor(Green, Black);
 					cout << usernames[i] << " отключился." << endl;
 					SetColor(White, Black);
 					fds[i].fd = -1;
 					compress_array = true;	//сжать массив соединений
 					close_conn = false;
+
+					std::string bufSend = usernames[i] + " отключился.";
+					for (int j = 1; j < fdsNum; j++) {
+						if (j != i) {
+							dataLen = send(fds[j].fd, bufSend.data(), BUFLEN, 0);							
+						}
+					}
 					continue;
 				}
 
@@ -241,6 +253,12 @@ int main()
 					SetColor(Green, Black);
 					cout << usernames[i] << " подключился." << endl;
 					SetColor(White, Black);
+					std::string bufSend = usernames[i] + " подключился.";
+					for (int j = 1; j < fdsNum; j++) {
+						if (j != i) {
+							dataLen = send(fds[j].fd, bufSend.data(), BUFLEN, 0);
+						}
+					}
 				}
 			}
 
@@ -273,6 +291,7 @@ int main()
 			closesocket(fds[i].fd);
 	}
 
+	cin.get();
 	WSACleanup();
 
 	return 0;

@@ -23,6 +23,7 @@ void WSAInit()
 		//инициализация интерфейса сокетов
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		cout << "Ошибка WSAStartup " << WSAGetLastError();
+		cin.get();
 		exit(1);
 	}
 	else if (debug) 
@@ -40,6 +41,7 @@ void socketInit(const PCSTR& IP, const int& addrFamily, const int& sockType)
 		cout << "Ошибка инициализации сокета " << WSAGetLastError();
 		closesocket(clSock);
 		WSACleanup();
+		cin.get();
 		exit(1);
 	}
 	else if (debug) 
@@ -51,6 +53,7 @@ void socketInit(const PCSTR& IP, const int& addrFamily, const int& sockType)
 
 	if (inet_pton(addrFamily, IP, &serv_ip) <= 0) {
 		cout << "Ошибка преобразования IP-адреса" << endl;
+		cin.get();
 		exit(1);
 	}
 
@@ -67,6 +70,7 @@ void socketInit(const PCSTR& IP, const int& addrFamily, const int& sockType)
 		cout << "Ошибка привязки сокета к серверу " << WSAGetLastError() << endl;
 		closesocket(clSock);
 		WSACleanup();
+		cin.get();
 		exit(1);
 	}
 	else if (debug) 
@@ -133,8 +137,10 @@ int main()
 
 	while (!end_client) {
 		
-		while (bufSend.size() == 0) getline(cin, bufSend);					
-			
+		while (bufSend.size() == 0 && !end_client) getline(cin, bufSend);					
+
+		if (end_client) break;
+
 		packet_size = send(clSock, bufSend.data(), bufSend.size(), 0);
 		bufSend.clear();
 		if (packet_size == SOCKET_ERROR) {
